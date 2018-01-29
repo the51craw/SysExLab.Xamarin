@@ -22,9 +22,9 @@ namespace SysExLab_MacOS
         private Picker InputSelector;
         //public MIDI midi;
 
-        //public AppDelegate()
-        //{
-        //}
+        public AppDelegate()
+        {
+        }
 
         //
         // This method is invoked when the application has loaded and is ready to run. In this 
@@ -39,6 +39,7 @@ namespace SysExLab_MacOS
             global::Xamarin.Forms.Forms.Init();
             Xamarin.Forms.Platform.MacOS.PageRenderer.
             SysExLab.MainPage. LoadApplication(new SysExLab.App());
+            //mainPage = new SysExLab.MainPage();
 
             // Get SysExLab.MainPage:
             mainPage = SysExLab.MainPage.GetMainPage();
