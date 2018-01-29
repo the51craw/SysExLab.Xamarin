@@ -13,6 +13,7 @@ namespace SysExLab
         {
             UWP,
             IOS,
+            MacOS,
             ANDROID,
         }
 
