@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-using Foundation;
-//using UIKit;
-using AppKit;
+﻿using AppKit;
 
 namespace SysExLab_MacOS
 {
@@ -13,8 +7,8 @@ namespace SysExLab_MacOS
         static void Main(string[] args)
         {
             NSApplication.Init();
-            NSApplication.Main(args/*, null, "AppDelegate"*/);
-            //UIApplication.Main(args, null, "AppDelegate");
+            NSApplication.SharedApplication.Delegate = new AppDelegate();
+            NSApplication.Main(args);
         }
     }
 }
