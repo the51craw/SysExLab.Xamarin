@@ -157,7 +157,7 @@ namespace SysExLab
 
         private void Picker_SelectedIndexChanged(object sender, EventArgs e)
         {
-            ltToneName.Text.Text = (String)((Picker)(sender)).SelectedItem;
+            //ltToneName.Text.Text = (String)((Picker)(sender)).SelectedItem;
         }
 
         public void Btn0_Clicked(object sender, EventArgs e)

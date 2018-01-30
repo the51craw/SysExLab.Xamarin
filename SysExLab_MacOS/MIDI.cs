@@ -7,7 +7,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Xamarin.Forms;
 using CoreMidi;
 
-namespace SysExLab.iOS
+namespace SysExLab_MacOS
 {
     public class MIDI
     {
@@ -21,15 +21,19 @@ namespace SysExLab.iOS
         public byte MidiInPortChannel { get; set; }
         public Int32 MidiOutPortSelectedIndex { get; set; }
         public Int32 MidiInPortSelectedIndex { get; set; }
+        Picker OutputDeviceSelector;
+        Picker InputDeviceSelector;
         List<String> deviceNames;
 
         // Constructor using a combobox for full device watch:
-        public MIDI(MainPage mainPage, Picker OutputDeviceSelector, Picker InputDeviceSelector, /*CoreDispatcher Dispatcher,*/ byte MidiOutPortChannel, byte MidiInPortChannel)
+        public MIDI(SysExLab.MainPage mainPage, Picker OutputDeviceSelector, Picker InputDeviceSelector, /*CoreDispatcher Dispatcher,*/ byte MidiOutPortChannel, byte MidiInPortChannel)
         {
             //midiOutputDeviceWatcher = new MidiDeviceWatcher(MidiOutPort.GetDeviceSelector(), OutputDeviceSelector, Dispatcher);
             //midiInputDeviceWatcher = new MidiDeviceWatcher(MidiInPort.GetDeviceSelector(), InputDeviceSelector, Dispatcher);
             //midiOutputDeviceWatcher.StartWatcher();
             //midiInputDeviceWatcher.StartWatcher();
+            this.OutputDeviceSelector = OutputDeviceSelector;
+            this.InputDeviceSelector = InputDeviceSelector;
             this.MidiOutPortChannel = MidiOutPortChannel;
             this.MidiInPortChannel = MidiInPortChannel;
             deviceNames = new List<String>();
@@ -64,8 +68,14 @@ namespace SysExLab.iOS
             } catch { }
         }
 
-        //public async void Init(String deviceName)
-        //{
+        public void Init(String deviceName)
+        {
+            for (Int32 i = 0; i < Midi.DeviceCount; i++)
+            {
+                MidiDevice md = Midi.GetDevice(i);
+                //OutputDeviceSelector.Items.Add(md.DisplayName);
+                //InputDeviceSelector.Items.Add(md.DisplayName);
+            }
         //    //DeviceInformationCollection midiOutputDevices = await DeviceInformation.FindAllAsync(MidiOutPort.GetDeviceSelector());
         //    //DeviceInformationCollection midiInputDevices = await DeviceInformation.FindAllAsync(MidiInPort.GetDeviceSelector());
         //    //DeviceInformation midiOutDevInfo = null;
@@ -108,7 +118,7 @@ namespace SysExLab.iOS
         //    {
         //        System.Diagnostics.Debug.WriteLine("Unable to create MidiInPort from output device");
         //    }
-        //}
+        }
 
         //public void UpdateMidiComboBoxes(Picker midiOutputComboBox, Picker midiInputComboBox)
         //{

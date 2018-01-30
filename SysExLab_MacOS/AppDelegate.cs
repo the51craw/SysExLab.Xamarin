@@ -9,6 +9,9 @@ namespace SysExLab_MacOS
     public class AppDelegate : FormsApplicationDelegate
     {
         NSWindow mainPage;
+        private Picker OutputSelector;
+        private Picker InputSelector;
+        public MIDI midi;
 
         public AppDelegate()
         {
@@ -30,6 +33,14 @@ namespace SysExLab_MacOS
             Forms.Init();
             LoadApplication(new SysExLab.App());
             SysExLab.MainPage.GetMainPage().uIHandler.DrawMain();
+ 
+            // We need invisible ComboBoxes to hold settings from the
+            // corresponding Pickers in the Xamarin code.
+            OutputSelector = SysExLab.MainPage.GetMainPage().uIHandler.midiOutputDevice;
+            InputSelector = SysExLab.MainPage.GetMainPage().uIHandler.midiInputDevice;
+            midi = new MIDI(SysExLab.MainPage.GetMainPage(), OutputSelector, InputSelector, /*Dispatcher,*/ 0, 0);
+            midi.Init("INTEGRA-7");
+
             base.DidFinishLaunching(notification);
         }
 
