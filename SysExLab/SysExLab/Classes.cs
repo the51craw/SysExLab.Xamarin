@@ -22,6 +22,7 @@ namespace SysExLab
             {
                 Row = new Grid();
                 Grid.SetRow(Row, row);
+                Row.MinimumHeightRequest = 50;
                 Row.SetValue(Grid.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                 Row.SetValue(Grid.VerticalOptionsProperty, LayoutOptions.Start);
                 Row.SetValue(Grid.ColumnSpacingProperty, 0);
@@ -58,6 +59,11 @@ namespace SysExLab
                             {
                                 controls[i].SetValue(Switch.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(Switch.VerticalOptionsProperty, LayoutOptions.Start);
+                            }
+                            else if (controls[i].GetType() == typeof(LabeledSwitch))
+                            {
+                                controls[i].SetValue(LabeledSwitch.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
+                                controls[i].SetValue(LabeledSwitch.VerticalOptionsProperty, LayoutOptions.Start);
                             }
                             else if (controls[i].GetType() == typeof(ListView))
                             {

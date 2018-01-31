@@ -1,4 +1,4 @@
-﻿using System;
+﻿using   System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -249,29 +249,30 @@ namespace SysExLab
         }
     }
 
-    public class RadioButton : Grid
+    public class LabeledSwitch : Grid
     {
+        //public Grid TheGrid { get; set; }
         public _orientation Orientation { get; set; }
         public _labelPosition LabelPosition { get; set; }
         public Label Label { get; set; }
         public Switch Switch { get; set; }
 
-        public RadioButton(String LabelText)
+        public LabeledSwitch(String LabelText)
         {
-            radioButton(LabelText, null, 0, _orientation.HORIZONTAL, _labelPosition.BEFORE, null);
+            labeledSwitch(LabelText, null, false, _orientation.HORIZONTAL, _labelPosition.BEFORE, null);
         }
 
-        public RadioButton(String LabelText, Picker Picker = null, byte[] Sizes = null)
+        public LabeledSwitch(String LabelText, Switch Switch = null, byte[] Sizes = null)
         {
-            radioButton(LabelText, Switch, 0, _orientation.HORIZONTAL, _labelPosition.BEFORE, Sizes);
+            labeledSwitch(LabelText, Switch, false, _orientation.HORIZONTAL, _labelPosition.BEFORE, Sizes);
         }
 
-        public RadioButton(String LabelText, Picker Picker = null, Int32 SelectedIndex = 0, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
+        public LabeledSwitch(String LabelText, Switch Switch = null, Boolean IsSelected = false, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
         {
-            radioButton(LabelText, Switch, SelectedIndex, Orientation, LabelPosition, Sizes);
+            labeledSwitch(LabelText, Switch, IsSelected, Orientation, LabelPosition, Sizes);
         }
 
-        private void radioButton(String LabelText, Switch Switch = null, Int32 SelectedIndex = 0, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
+        private void labeledSwitch(String LabelText, Switch Switch = null, Boolean IsSelected = false, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
         {
             this.Orientation = Orientation;
             this.LabelPosition = LabelPosition;
@@ -310,6 +311,7 @@ namespace SysExLab
                     this.Switch.HorizontalOptions = LayoutOptions.Start;
                     this.Children.Add((new GridRow(0, new View[] { this.Switch, this.Label }, sizes, true)).Row);
                 }
+                this.Label.VerticalOptions = LayoutOptions.Center;
             }
             else
             {
@@ -327,8 +329,92 @@ namespace SysExLab
                     this.Children.Add((new GridRow(0, new View[] { this.Switch }, null, true)).Row);
                     this.Children.Add((new GridRow(1, new View[] { this.Label }, null, true)).Row);
                 }
+                this.Label.HorizontalOptions = LayoutOptions.Center;
             }
-            this.Switch.IsToggled = false;
+            this.Switch.IsToggled = IsSelected;
         }
     }
+
+    //public class RadioButton : Grid
+    //{
+    //    public _orientation Orientation { get; set; }
+    //    public _labelPosition LabelPosition { get; set; }
+    //    public Label Label { get; set; }
+    //    public Switch Switch { get; set; }
+
+    //    public RadioButton(String LabelText)
+    //    {
+    //        radioButton(LabelText, null, 0, _orientation.HORIZONTAL, _labelPosition.BEFORE, null);
+    //    }
+
+    //    public RadioButton(String LabelText, Picker Picker = null, byte[] Sizes = null)
+    //    {
+    //        radioButton(LabelText, Switch, 0, _orientation.HORIZONTAL, _labelPosition.BEFORE, Sizes);
+    //    }
+
+    //    public RadioButton(String LabelText, Picker Picker = null, Int32 SelectedIndex = 0, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
+    //    {
+    //        radioButton(LabelText, Switch, SelectedIndex, Orientation, LabelPosition, Sizes);
+    //    }
+
+    //private void radioButton(String LabelText, String[] ItemLabels, Switch Switch = null, Int32 SelectedIndex = 0, _orientation Orientation = _orientation.HORIZONTAL, _labelPosition LabelPosition = _labelPosition.BEFORE, byte[] Sizes = null)
+    //{
+    //    this.Orientation = Orientation;
+    //    this.LabelPosition = LabelPosition;
+    //    this.Label = new Label();
+    //    this.Label.Text = LabelText;
+    //    if (Switch == null)
+    //    {
+    //        this.Switch = new Switch();
+    //    }
+    //    else
+    //    {
+    //        this.Switch = Switch;
+    //    }
+    //    byte[] sizes;
+    //    if (Sizes == null || Sizes.Count() != 2)
+    //    {
+    //        sizes = new byte[] { 1, 1 };
+    //    }
+    //    else
+    //    {
+    //        sizes = Sizes;
+    //    }
+
+    //    this.Switch.VerticalOptions = LayoutOptions.FillAndExpand;
+    //    this.Label.VerticalOptions = LayoutOptions.FillAndExpand;
+    //    if (Orientation == _orientation.HORIZONTAL)
+    //    {
+
+    //        if (LabelPosition == _labelPosition.BEFORE)
+    //        {
+    //            this.Label.HorizontalOptions = LayoutOptions.End;
+    //            this.Children.Add((new GridRow(0, new View[] { this.Label, this.Switch }, sizes, true)).Row);
+    //        }
+    //        else
+    //        {
+    //            this.Switch.HorizontalOptions = LayoutOptions.Start;
+    //            this.Children.Add((new GridRow(0, new View[] { this.Switch, this.Label }, sizes, true)).Row);
+    //        }
+    //    }
+    //    else
+    //    {
+    //        if (LabelPosition == _labelPosition.BEFORE)
+    //        {
+    //            this.Label.HorizontalOptions = LayoutOptions.Start;
+    //            this.Switch.HorizontalOptions = LayoutOptions.End;
+    //            this.Children.Add((new GridRow(0, new View[] { this.Label }, null, true)).Row);
+    //            this.Children.Add((new GridRow(1, new View[] { this.Switch }, null, true)).Row);
+    //        }
+    //        else
+    //        {
+    //            this.Label.HorizontalOptions = LayoutOptions.End;
+    //            this.Switch.HorizontalOptions = LayoutOptions.Start;
+    //            this.Children.Add((new GridRow(0, new View[] { this.Switch }, null, true)).Row);
+    //            this.Children.Add((new GridRow(1, new View[] { this.Label }, null, true)).Row);
+    //        }
+    //    }
+    //    this.Switch.IsToggled = false;
+    //}
+    //}
 }

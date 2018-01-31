@@ -17,6 +17,7 @@ using SysExLab.UWP;
 using Xamarin.Forms;
 
 [assembly: Xamarin.Forms.Dependency(typeof(GenericHandlerInterface))]
+[assembly: Dependency(typeof(MIDI))]
 
 namespace SysExLab.UWP
 {
@@ -30,7 +31,7 @@ namespace SysExLab.UWP
             {
                 mainPage.midi.Init("INTEGRA-7");
             }
-            mainPage.midi.ProgramChange(0, 88, 0, 1);
+            //mainPage.midi.ProgramChange(0, 88, 0, 1);
         }
     }
 
@@ -45,6 +46,8 @@ namespace SysExLab.UWP
         public MIDI midi;
         // For accessing the genericHandlerInterface:
         GenericHandlerInterface genericHandlerInterface;
+        public Windows.UI.Core.CoreDispatcher dispatcher;
+
 
         public MainPage()
         {
@@ -56,6 +59,8 @@ namespace SysExLab.UWP
         
         private void Init()
         {
+            // Get dispatcher:
+            dispatcher = Dispatcher;
             // Get SysExLab.MainPage:
             mainPage = SysExLab.MainPage.GetMainPage();
             UIHandler.appType = UIHandler._appType.UWP;
@@ -70,7 +75,7 @@ namespace SysExLab.UWP
             // corresponding Pickers in the Xamarin code.
             OutputSelector = mainPage.uIHandler.midiOutputDevice;
             InputSelector = mainPage.uIHandler.midiInputDevice;
-            midi = new MIDI(this, OutputSelector, InputSelector, Dispatcher, 0, 0);
+            midi = new MIDI(mainPage, this, OutputSelector, InputSelector, 0, 0);
             midi.Init("INTEGRA-7");
         }
 

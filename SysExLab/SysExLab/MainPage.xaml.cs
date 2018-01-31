@@ -26,14 +26,8 @@ namespace SysExLab
 
         public void Init()
         {
-            //Button myButton = this.FindByName<Button>("MyButton");
-            //myButton.Text = "Changed!";
             StackLayout mainStackLayout = this.FindByName<StackLayout>("MainStackLayout");
-            uIHandler = new UIHandler(mainStackLayout);
-            //uIHandler.Clear();
-            //Button newButton = new Button();
-            //newButton.Text = "New button!";
-            //mainGrid.Children.Add(newButton);
+            uIHandler = new UIHandler(mainStackLayout, this);
         }
 
         public static MainPage GetMainPage()
