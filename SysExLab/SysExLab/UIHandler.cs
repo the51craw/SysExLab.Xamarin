@@ -1,5 +1,4 @@
-﻿using Java.Util;
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Xamarin.Forms;
@@ -141,15 +140,13 @@ namespace SysExLab
             mainStackLayout.Children.Add((new GridRow(0, new View[] { midiOutputDevicePicker, midiOutputChannel }, new byte[] { 1, 1 })).Row);
             mainStackLayout.Children.Add((new GridRow(1, new View[] { midiInputDevicePicker, midiInputChannel }, new byte[] { 1, 1 })).Row);
             mainStackLayout.Children.Add((new GridRow(2, new View[] { messageType, messageTypeHelp }, new byte[] { 1, 1 })).Row);
-            mainStackLayout.Children.Add((new GridRow(3, new View[] { rcvKeepAlive, btnClear, btnSend }, new byte[] { 1, 1, 1 })).Row);
-            mainStackLayout.Children.Add((new GridRow(4, new View[] { tbAddress })).Row);
-            mainStackLayout.Children.Add((new GridRow(5, new View[] { tbData })).Row);
+            mainStackLayout.Children.Add((new GridRow(3, new View[] { tbAddress })).Row);
+            mainStackLayout.Children.Add((new GridRow(4, new View[] { tbData })).Row);
+            mainStackLayout.Children.Add((new GridRow(5, new View[] { rcvKeepAlive, btnClear, btnSend }, new byte[] { 1, 1, 1 })).Row);
             mainStackLayout.Children.Add((new GridRow(6, new View[] { lvReceivedList })).Row);
 
             midi = DependencyService.Get<IMidi>();
             midi.Init("INTEGRA-7", mainPage);
-            //midi.Init("INTEGRA-7", mainPage, midiOutputDevicePicker.Picker, midiInputDevicePicker.Picker,
-            //    (byte)midiOutputChannel.Picker.SelectedIndex, (byte)midiInputChannel.Picker.SelectedIndex);
         }
 
         private void MessageTypePicker_SelectedIndexChanged(object sender, EventArgs e)
@@ -240,6 +237,7 @@ namespace SysExLab
         private void BtnClear_Clicked(object sender, EventArgs e)
         {
             receivedLines.Clear();
+            midi.NoteOn(0,0,0);
         }
 
         private String ToHex(byte data)

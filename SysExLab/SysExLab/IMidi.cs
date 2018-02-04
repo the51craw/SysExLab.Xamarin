@@ -13,7 +13,7 @@ namespace SysExLab
 
         void Init(String deviceName, SysExLab.MainPage mainPage);
 
-        void Init(String deviceName, SysExLab.MainPage mainPage, Picker OutputDeviceSelector, Picker InputDeviceSelector, /*CoreDispatcher Dispatcher,*/ byte MidiOutPortChannel, byte MidiInPortChannel);
+        //void Init(String deviceName, SysExLab.MainPage mainPage, Picker OutputDeviceSelector, Picker InputDeviceSelector, /*CoreDispatcher Dispatcher,*/ byte MidiOutPortChannel, byte MidiInPortChannel);
 
         void NoteOn(byte currentChannel, byte noteNumber, byte velocity);
 
