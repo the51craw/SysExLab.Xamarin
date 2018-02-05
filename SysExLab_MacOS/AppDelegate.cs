@@ -9,7 +9,7 @@ using SysExLab_MacOS;
 namespace SysExLab_MacOS
 {
     [Register("AppDelegate")]
-    public class AppDelegate : FormsApplicationDelegate
+    public partial class AppDelegate : FormsApplicationDelegate
     {
         NSWindow mainPage_MacOS;
         private Picker OutputSelector;

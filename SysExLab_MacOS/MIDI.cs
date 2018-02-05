@@ -16,8 +16,9 @@ namespace SysExLab_MacOS
         //public MidiDeviceWatcher midiInputDeviceWatcher;
         //public MidiOutPort midiOutPort;
         //public MidiInPort midiInPort;
-        public MidiEndpoint midiOutPort;
-        public MidiEndpoint midiInPort;
+        public MidiPort midiOutPort;
+        public MidiPort midiInPort;
+        public MidiEntity midiEntity;
         public byte MidiOutPortChannel { get; set; }
         public byte MidiInPortChannel { get; set; }
         public Int32 MidiOutPortSelectedIndex { get; set; }
@@ -71,9 +72,34 @@ namespace SysExLab_MacOS
             }
         }
 
-        public void MidiInPort_MessageReceived(MidiDevice sender, MidiPacketsEventArgs args)
+        void MidiInPort_MessageReceived(object sender, MidiPacketsEventArgs e)
         {
-            CoreMidi.MidiPacket receivedMidiMessage = args.Packets[0];
+            //((MidiPort)sender).GetData();
+            Int32 messageLength = 0;
+            for (Int32 packetsLength = 0; packetsLength < e.Packets.Length; packetsLength++)
+            {
+                messageLength += e.Packets[packetsLength].Length;
+            }
+            CoreMidi.MidiPacket receivedMidiMessage = e.Packets[0];
+            rawData = new byte[receivedMidiMessage.Length];
+            //for (Int32 i = 0; i < receivedMidiMessage.Length; i++)
+            {
+                NSData data = NSData.FromArray(rawData);
+                //IntPtr ip = new IntPtr(midiEntity.Device.UniqueID);
+                IntPtr ip = new IntPtr(midiInPort.Handle);
+                NSData content = midiInPort.GetData(ip);
+                //rawData[i] = (byte)(receivedMidiMessage.Bytes + i);
+            }
+            MessageReceived = true;
+        }
+
+        //public delegate void MidiInPort_MessageReceived(MidiDevice sender, MidiPacketsEventArgs args);
+        //void MidiInPort_MessageReceived(MidiDevice sender, MidiPacketsEventArgs args)
+        /*
+        delegate void MidiInPort_MessageReceived(object sender, EventArgs args)
+        {
+            //MidiDevice sender, MidiPacketsEventArgs args
+            CoreMidi.MidiPacket receivedMidiMessage = ((MidiPacketsEventArgs)args).Packets[0];
             rawData = new byte[receivedMidiMessage.Length];
             for (Int32 i = 0; i < receivedMidiMessage.Length; i++)
             {
@@ -81,6 +107,7 @@ namespace SysExLab_MacOS
             }
             MessageReceived = true;
         }
+        */
 
         // Constructor using a combobox for full device watch:
         //        public MIDI(SysExLab.MainPage mainPage, SysExLab_MacOS.MainClass mainPage_MacOS, Picker OutputDeviceSelector, Picker InputDeviceSelector, byte MidiOutPortChannel, byte MidiInPortChannel)
@@ -142,133 +169,175 @@ namespace SysExLab_MacOS
         public void Init(String deviceName)
         {
             MidiDevice md;
-/*            if (midiClient == null)
+            Midi.Restart();
+            if (midiClient == null)
             {
                 midiClient = new MidiClient("TheMidiClient");
-                midiClient.ObjectAdded += delegate (object sender, ObjectAddedOrRemovedEventArgs e) {
-                    //Console.WriteLine("Object {0} added to {1}", e.Child, e.Parent);
+                midiClient.ObjectAdded += delegate (object sender, ObjectAddedOrRemovedEventArgs e)
+                {
+                    Int32 handle = ((MidiClient)sender).Handle;
+                    //MidiEndpoint me = (MidiEndpoint)e;
+                    //if (((MidiEndpoint)e).Child.IsBroadcast)
+                    IntPtr ip = new IntPtr(handle); 
                 };
-                midiClient.ObjectRemoved += delegate (object sender, ObjectAddedOrRemovedEventArgs e) {
+                midiClient.ObjectRemoved += delegate (object sender, ObjectAddedOrRemovedEventArgs e)
+                {
                     //Console.WriteLine("Object {0} removed to {1}", e.Child, e.Parent);
                 };
-                midiClient.PropertyChanged += delegate (object sender, ObjectPropertyChangedEventArgs e) {
+                midiClient.PropertyChanged += delegate (object sender, ObjectPropertyChangedEventArgs e)
+                {
                     //Console.WriteLine("Property {0} changed on {1}", e.PropertyName, e.MidiObject);
                 };
-                midiClient.ThruConnectionsChanged += delegate {
+                midiClient.ThruConnectionsChanged += delegate
+                {
                     //Console.WriteLine("Thru connections changed");
                 };
-                midiClient.SerialPortOwnerChanged += delegate {
+                midiClient.SerialPortOwnerChanged += delegate
+                {
                     //Console.WriteLine("Serial port changed");
                 };
             }
-*/            Midi.Restart();
+            midiOutPort = midiClient.CreateOutputPort("MIDI Out Port");
+            midiInPort = midiClient.CreateInputPort("MIDI In Port");
+            midiInPort.MessageReceived += MidiInPort_MessageReceived;
+            //midiInPort.ConnectSource()
+
+            //            Midi.Restart();
             for (Int32 i = 0; i < Midi.DeviceCount; i++)
             {
                 md = Midi.GetDevice(i);
-                if (md.Name != null)
+                //if (md.Name != null)
+                if (md.EntityCount > 0)
                 {
                     mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
                     if (md.Name.Contains("INTEGRA-7"))
                     {
                         for (Int32 e = 0; e < md.EntityCount; e++)
                         {
-                            MidiEntity me = md.GetEntity(e);
-                            midiOutPort = me.GetDestination(0);
-                            midiInPort = me.GetSource(0);
-                            midiOutPort.IsBroadcast = true;
-                            midiInPort.IsBroadcast = false;
+                            midiEntity = md.GetEntity(e);
+                            midiInPort.ConnectSource(midiEntity.GetSource(0));
+                            midiOutPort.ConnectSource(midiEntity.GetDestination(0));
+                            //MidiEntity me = md.GetEntity(0);
+                            //MidiEndpoint mep = me.GetDestination(0);
+                            //if (mep.IsBroadcast)
+                            //{
+                            //    midiOutPort.ConnectSource(midiEntity.GetSource(0));
+                            //}
+                            //else
+                            //{
+                            //    midiInPort.ConnectSource(midiEntity.GetSource(0));
+                            //}
+                            //midiInPort = me.GetSource(0);
+                            //midiOutPort.IsBroadcast = true;
+                            //midiInPort.IsBroadcast = false;
+                            //midiInPort.MessageReceived += MidiInPort_MessageReceived;
+                            /*midiInPort.MessageReceived += (sender, args) =>
+                            {
+                                //MidiDevice sender, MidiPacketsEventArgs args
+                                MidiPacket receivedMidiMessage = ((MidiPacketsEventArgs)args).Packets[0];
+                                rawData = new byte[receivedMidiMessage.Length];
+                                for (Int32 messageLength = 0; messageLength < receivedMidiMessage.Length; messageLength++)
+                                {
+                                    rawData[messageLength] = (byte)(receivedMidiMessage.Bytes + messageLength);
+                                }
+                                MessageReceived = true;
+                            };*/
+
                         }
                         mainPage.uIHandler.midiOutputDevice.SelectedIndex = i;
                     }
                 }
-                else if (md.DisplayName != null)
-                {
-                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
-                    if (md.DisplayName.Contains("INTEGRA-7"))
-                    {
-                        for (Int32 e = 0; e < md.EntityCount; e++)
-                        {
-                            MidiEntity me = md.GetEntity(e);
-                            midiOutPort = me.GetDestination(0);
-                            midiInPort = me.GetSource(0);
-                            midiOutPort.IsBroadcast = true;
-                            midiInPort.IsBroadcast = false;
-                        }
-                        mainPage.uIHandler.midiOutputDevice.SelectedIndex = i;
-                    }
-                }
-                md.Dispose();
-            }
-/*            for (Int32 i = 0; i < Midi.ExternalDeviceCount; i++)
-            {
-                md = Midi.GetExternalDevice(i);
-                if (md.Name != null)
-                {
-                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
-                    if (md.Name.Contains("INTEGRA-7"))
-                    {
-                        midiOutPort = md;
-                    }
-                }
-                else if (md.DisplayName != null)
-                {
-                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
-                    if (md.DisplayName.Contains("INTEGRA-7"))
-                    {
-                        midiOutPort = md;
-                    }
-                }
-                md.Dispose();
-            }
-*/
-/*            DeviceInformationCollection midiOutputDevices = await DeviceInformation.FindAllAsync(MidiOutPort.GetDeviceSelector());
-            DeviceInformationCollection midiInputDevices = await DeviceInformation.FindAllAsync(MidiInPort.GetDeviceSelector());
-            DeviceInformation midiOutDevInfo = null;
-            DeviceInformation midiInDevInfo = null;
+                /* else if (md.DisplayName != null)
+                 {
+                     mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
+                     if (md.DisplayName.Contains("INTEGRA-7"))
+                     {
+                         for (Int32 e = 0; e < md.EntityCount; e++)
+                         {
+                             MidiEntity me = md.GetEntity(e);
+                             midiOutPort = me.GetDestination(0);
+                             midiInPort = me.GetSource(0);
+                             midiOutPort.IsBroadcast = true;
+                             midiInPort.IsBroadcast = false;
+                         }
+                         mainPage.uIHandler.midiOutputDevice.SelectedIndex = i;
+                     }
+                 }
+                 md.Dispose();
+             }
+         }
+             */
+                /*            for (Int32 i = 0; i < Midi.ExternalDeviceCount; i++)
+                            {
+                                md = Midi.GetExternalDevice(i);
+                                if (md.Name != null)
+                                {
+                                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
+                                    if (md.Name.Contains("INTEGRA-7"))
+                                    {
+                                        midiOutPort = md;
+                                    }
+                                }
+                                else if (md.DisplayName != null)
+                                {
+                                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
+                                    if (md.DisplayName.Contains("INTEGRA-7"))
+                                    {
+                                        midiOutPort = md;
+                                    }
+                                }
+                                md.Dispose();
+                            }
+                */
+                /*            DeviceInformationCollection midiOutputDevices = await DeviceInformation.FindAllAsync(MidiOutPort.GetDeviceSelector());
+                            DeviceInformationCollection midiInputDevices = await DeviceInformation.FindAllAsync(MidiInPort.GetDeviceSelector());
+                            DeviceInformation midiOutDevInfo = null;
+                            DeviceInformation midiInDevInfo = null;
 
-            foreach (DeviceInformation device in midiOutputDevices)
-            {
-                if (device.Name.Contains(deviceName))
-                {
-                    midiOutDevInfo = device;
-                    break;
-                }
-            }
+                            foreach (DeviceInformation device in midiOutputDevices)
+                            {
+                                if (device.Name.Contains(deviceName))
+                                {
+                                    midiOutDevInfo = device;
+                                    break;
+                                }
+                            }
 
-            if (midiOutDevInfo != null)
-            {
-                midiOutPort = (MidiOutPort)await MidiOutPort.FromIdAsync(midiOutDevInfo.Id);
-            }
+                            if (midiOutDevInfo != null)
+                            {
+                                midiOutPort = (MidiOutPort)await MidiOutPort.FromIdAsync(midiOutDevInfo.Id);
+                            }
 
-            foreach (DeviceInformation device in midiInputDevices)
-            {
-                if (device.Name.Contains(deviceName))
-                {
-                    midiInDevInfo = device;
-                    break;
-                }
-            }
+                            foreach (DeviceInformation device in midiInputDevices)
+                            {
+                                if (device.Name.Contains(deviceName))
+                                {
+                                    midiInDevInfo = device;
+                                    break;
+                                }
+                            }
 
-            if (midiInDevInfo != null)
-            {
-                midiInPort = await MidiInPort.FromIdAsync(midiInDevInfo.Id);
-            }
+                            if (midiInDevInfo != null)
+                            {
+                                midiInPort = await MidiInPort.FromIdAsync(midiInDevInfo.Id);
+                            }
 
-            if (midiOutPort == null)
-            {
-                System.Diagnostics.Debug.WriteLine("Unable to create MidiOutPort from output device");
-            }
+                            if (midiOutPort == null)
+                            {
+                                System.Diagnostics.Debug.WriteLine("Unable to create MidiOutPort from output device");
+                            }
 
-            if (midiInPort == null)
-            {
-                System.Diagnostics.Debug.WriteLine("Unable to create MidiInPort from output device");
+                            if (midiInPort == null)
+                            {
+                                System.Diagnostics.Debug.WriteLine("Unable to create MidiInPort from output device");
+                            }
+                            else
+                            {
+                                midiInPort.MessageReceived += MidiInPort_MessageReceived;
+                            }
+                */
             }
-            else
-            {
-                midiInPort.MessageReceived += MidiInPort_MessageReceived;
-            }
-*/        }
-
+        }
 /*        public void UpdateMidiComboBoxes(Picker midiOutputComboBox, Picker midiInputComboBox)
         {
             midiOutputDeviceWatcher.UpdateComboBox(midiOutputComboBox, MidiOutPortSelectedIndex);
@@ -354,7 +423,8 @@ namespace SysExLab_MacOS
                 //data = mp.Bytes;
                 IntPtr ip = data.ClassHandle;
                 midiOutPort.SetData(data.ClassHandle, data);
-                midiOutPort.FlushOutput();
+                //midiOutPort.Send()
+                //midiOutPort.FlushOutput();
 
                 //IMidiMessage midiMessageToSend = new MidiNoteOnMessage(currentChannel, noteNumber, velocity);
                 //midiOutPort.SendMessage(midiMessageToSend);
