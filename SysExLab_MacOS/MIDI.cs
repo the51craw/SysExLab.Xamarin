@@ -1,34 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Timers;
+//using System.Timers;
 using Xamarin.Forms;
 using CoreMidi;
 using SysExLab;
 using Foundation;
-
-//[assembly: Xamarin.Forms.Dependency(typeof(GenericHandlerInterface))]
+using System.Threading;
 
 namespace SysExLab_MacOS
 {
     public class MIDI : IMidi
     {
-        //public MidiDeviceWatcher midiOutputDeviceWatcher;
-        //public MidiDeviceWatcher midiInputDeviceWatcher;
-        //public MidiOutPort midiOutPort;
-        //public MidiInPort midiInPort;
         public MidiPort midiOutPort;
         public MidiPort midiInPort;
+        public MidiDevice midiDevice;
         public MidiEntity midiEntity;
+        MidiPacket midiPacket;
+        unsafe byte *indataPointer;
         public byte MidiOutPortChannel { get; set; }
         public byte MidiInPortChannel { get; set; }
         public Int32 MidiOutPortSelectedIndex { get; set; }
         public Int32 MidiInPortSelectedIndex { get; set; }
         public SysExLab.MainPage mainPage;
-        Picker OutputDeviceSelector;
-        Picker InputDeviceSelector;
-        List<String> deviceNames;
         public SysExLab_MacOS.AppDelegate mainPage_MacOS;
-        public byte[] rawData;
+        public byte[][] rawData;  /* Packets are coming in in small chunks, so
+                                     I need to have two buffers for incoming
+                                     hex data, one under filling, and one
+                                     possibly filled with data to handle. */
+        public Int32 validIndata; /* validIndata will point to the filled
+                                     buffer if one exists, else -1 */
+        public Int32 readIndex;   /* readindex is for reading the buffer
+                                     currently holding a complete message */
+        public Int32 incoming;    /* incoming will point to the current
+                                     buffer ready to be filled or is currently
+                                     being filled */
+        public Int32 writeIndex;  /* writeindex is for writing to the buffer
+                                     currently being filled */
         public Timer timer;
         public Boolean MessageReceived = false;
         CoreMidi.MidiClient midiClient = null;
@@ -38,24 +45,22 @@ namespace SysExLab_MacOS
             if (midiOutPort == null)
             {
                 mainPage_MacOS = DependencyService.Get<SysExLab_MacOS.AppDelegate>();
-                timer = new Timer(1);
-                timer.Elapsed += Timer_Tick;
             }
         }
 
-        private void Timer_Tick(object sender, ElapsedEventArgs e)
+        private void Timer_Tick(object sender)
         {
             if (MessageReceived)
             {
-                if (!(Boolean)mainPage.uIHandler.rcvKeepAlive.Switch.IsToggled && rawData.Length == 1 && rawData[0] == 0xfe)
+                if (!(Boolean)mainPage.uIHandler.rcvKeepAlive.Switch.IsToggled && rawData[validIndata].Length == 1 && rawData[validIndata][0] == 0xfe)
                 {
                     return;
                 }
                 String line = "";
                 Boolean lineWritten = false;
-                for (UInt16 i = 0; i < rawData.Length; i++)
+                for (UInt16 i = 0; i < rawData[validIndata].Length; i++)
                 {
-                    line += ToHex(rawData[i]);
+                    line += ToHex(rawData[validIndata][i]);
                     lineWritten = false;
                     if (line.Length >= 16 * 5)
                     {
@@ -72,93 +77,123 @@ namespace SysExLab_MacOS
             }
         }
 
-        void MidiInPort_MessageReceived(object sender, MidiPacketsEventArgs e)
+        /**
+         * This sucker gets called for every few bytes received, not just once per message.
+         * Thus it is neccesary not only to keep track of message starts and message endings,
+         * but also to keep two buffers in order to let Timer_Tick consume one ready
+         * buffer while the other might be filled out.
+         * The received package in e is actually a list of packages, which seems odd 
+         * when only a few bytes normally comes through, but that too must be handled.
+         */
+        internal unsafe void MidiInPort_MessageReceived(object sender, MidiPacketsEventArgs e)
         {
-            //((MidiPort)sender).GetData();
-            Int32 messageLength = 0;
-            for (Int32 packetsLength = 0; packetsLength < e.Packets.Length; packetsLength++)
+            // Loop incoming packages:
+            for (Int32 packetsIndex = 0; packetsIndex < e.Packets.Length; packetsIndex++)
             {
-                messageLength += e.Packets[packetsLength].Length;
+                // Obtain an unsafe pointer for fetching the bytes:
+                midiPacket = (MidiPacket)e.Packets.GetValue(packetsIndex);
+                IntPtr ip = midiPacket.Bytes;
+                indataPointer = (byte*)ip.ToPointer();
+
+                // Set currentReceiveBuffer to point to the one in use:
+                Int32 currentReceiveBuffer = 0;
+                if (validIndata == 0)
+                {
+                    currentReceiveBuffer = 1;
+                }
+
+                // If the first byte is a command byte (MSB = 1) this can be:
+                // A system real-time (single byte) message
+                // Start of a channel voice or mode message (no end command!)
+                // A system common message
+                // Start of a system exclusive message
+                // End of a system exclusive message
+                // Thus causing for starting or ending a message or 
+                // system common message with data or making a single byte message:
+                byte commandByte = indataPointer[0];
+                byte commandNibble = (byte)(commandByte & 0xf0);
+                if (commandByte == 0xf7)
+                {
+                    // This is an end of system exclusive that happened to 
+                    // come in as a last byte. It must be added to the
+                    // current message, so do nothing yet.
+                }
+                else if ((commandNibble >= 0x80 && commandNibble <= 0xe0) ||
+                    (commandByte >= 0xf1 && commandByte <= 0xfe))
+                {
+                    // This is a channel voice or mode message (no end command!)
+                    // If there is a current message in currentReceiveBuffer it
+                    // must be handled in Timer_Tick:
+                    if (rawData[currentReceiveBuffer].Length > 0)
+                    {
+                        validIndata = currentReceiveBuffer;
+                        currentReceiveBuffer++;
+                        currentReceiveBuffer = currentReceiveBuffer % 2;
+                        rawData[currentReceiveBuffer] = new byte[0];
+                        MessageReceived = true;
+                    }
+                }
+
+
+                // Back up whatever might have been read in earlier call:
+                byte[] tempBuffer = new byte[rawData[currentReceiveBuffer].Length];
+                for (Int32 i = 0; i < rawData[currentReceiveBuffer].Length; i++)
+                {
+                    tempBuffer[i] = rawData[currentReceiveBuffer][i];
+                }
+
+                // Remember how long that was in order to know where to continue:
+                Int32 previousLength = rawData[currentReceiveBuffer].Length;
+
+                //Re-create the current buffer with extended length:
+                rawData[currentReceiveBuffer] = new byte[tempBuffer.Length + midiPacket.Length];
+
+                // Copy back what was stored in backup:
+                //tempBuffer.CopyTo()
+                for (Int32 i = 0; i < tempBuffer.Length; i++)
+                {
+                    rawData[currentReceiveBuffer][i] = tempBuffer[i];
+                }
+
+                // Concatenate the new bytes:
+                for (Int32 i = 0; i < e.Packets[packetsIndex].Length; i++)
+                {
+                    rawData[currentReceiveBuffer][i + previousLength] = indataPointer[i];
+                }
+
+                // See if we now have a complete message:
+                commandByte = rawData[currentReceiveBuffer][0];
+                commandNibble = (byte)(commandByte & 0xf0);
+                if ((rawData[currentReceiveBuffer][rawData[currentReceiveBuffer].
+                       Length - 1] == 0xf7) // End of system exclusive
+                    || (commandNibble >= 0x80 && commandNibble <= 0xb0)
+                        && (rawData[currentReceiveBuffer].
+                            Length - 1 == 3) // 3-byte message
+                    || (commandNibble >= 0xc0 && commandNibble <= 0xe0
+                        && rawData[currentReceiveBuffer].
+                            Length - 1 == 2) // 2-byte message
+                    || ((commandByte == 0xf1 || commandByte == 0xf3)
+                        && rawData[currentReceiveBuffer].
+                            Length - 1 == 2) // 2-byte message
+                    || ((commandByte == 0xf4)
+                        && rawData[currentReceiveBuffer].
+                        Length - 1 == 1) // 1-byte message
+                   )
+                {
+                    validIndata = currentReceiveBuffer;
+                    currentReceiveBuffer++;
+                    currentReceiveBuffer = currentReceiveBuffer % 2;
+                    rawData[currentReceiveBuffer] = new byte[0];
+                    MessageReceived = true;
+                }
             }
-            CoreMidi.MidiPacket receivedMidiMessage = e.Packets[0];
-            rawData = new byte[receivedMidiMessage.Length];
-            //for (Int32 i = 0; i < receivedMidiMessage.Length; i++)
-            {
-                NSData data = NSData.FromArray(rawData);
-                //IntPtr ip = new IntPtr(midiEntity.Device.UniqueID);
-                IntPtr ip = new IntPtr(midiInPort.Handle);
-                NSData content = midiInPort.GetData(ip);
-                //rawData[i] = (byte)(receivedMidiMessage.Bytes + i);
-            }
-            MessageReceived = true;
         }
-
-        //public delegate void MidiInPort_MessageReceived(MidiDevice sender, MidiPacketsEventArgs args);
-        //void MidiInPort_MessageReceived(MidiDevice sender, MidiPacketsEventArgs args)
-        /*
-        delegate void MidiInPort_MessageReceived(object sender, EventArgs args)
-        {
-            //MidiDevice sender, MidiPacketsEventArgs args
-            CoreMidi.MidiPacket receivedMidiMessage = ((MidiPacketsEventArgs)args).Packets[0];
-            rawData = new byte[receivedMidiMessage.Length];
-            for (Int32 i = 0; i < receivedMidiMessage.Length; i++)
-            {
-                rawData[i] = (byte)(receivedMidiMessage.Bytes + i);
-            }
-            MessageReceived = true;
-        }
-        */
-
-        // Constructor using a combobox for full device watch:
-        //        public MIDI(SysExLab.MainPage mainPage, SysExLab_MacOS.MainClass mainPage_MacOS, Picker OutputDeviceSelector, Picker InputDeviceSelector, byte MidiOutPortChannel, byte MidiInPortChannel)
-        //{
-        //    this.mainPage = mainPage;
-        //    this.mainPage_UWP = mainPage_MacOS;
-        //    midiOutputDeviceWatcher = new MidiDeviceWatcher(MidiOutPort.GetDeviceSelector(), OutputDeviceSelector, mainPage_MacOS.dispatcher);
-        //    midiInputDeviceWatcher = new MidiDeviceWatcher(MidiInPort.GetDeviceSelector(), InputDeviceSelector, mainPage_MacOS.dispatcher);
-        //    midiOutputDeviceWatcher.StartWatcher();
-        //    midiInputDeviceWatcher.StartWatcher();
-        //    this.MidiOutPortChannel = MidiOutPortChannel;
-        //    this.MidiInPortChannel = MidiInPortChannel;
-        //}
-
-        //~MIDI()
-        //{
-        //    try
-        //    {
-        //        midiOutputDeviceWatcher.StopWatcher();
-        //        midiInputDeviceWatcher.StopWatcher();
-        //        midiOutPort.Dispose();
-        //        midiInPort.MessageReceived -= MidiInPort_MessageReceived;
-        //        midiInPort.Dispose();
-        //        midiOutPort = null;
-        //        midiInPort = null;
-        //    }
-        //    catch { }
-        //}
 
         // Simpleconstructor that takes the name of the device:
         public MIDI(String deviceName)
         {
             Init(deviceName);
         }
-
-        //public void Init(String deviceName, SysExLab.MainPage mainPage, Picker OutputDeviceSelector, Picker InputDeviceSelector, byte MidiOutPortChannel, byte MidiInPortChannel)
-        //{
-        //    Init(deviceName, OutputDeviceSelector, InputDeviceSelector, mainPage_UWP.dispatcher, MidiOutPortChannel, MidiInPortChannel);
-        //}
-
-        //public void Init(String deviceName, Picker OutputDeviceSelector, Picker InputDeviceSelector, CoreDispatcher Dispatcher, byte MidiOutPortChannel, byte MidiInPortChannel)
-        //{
-        //    //this.mainPage = mainPage;
-        //    midiOutputDeviceWatcher = new MidiDeviceWatcher(MidiOutPort.GetDeviceSelector(), OutputDeviceSelector, Dispatcher);
-        //    midiInputDeviceWatcher = new MidiDeviceWatcher(MidiInPort.GetDeviceSelector(), InputDeviceSelector, Dispatcher);
-        //    midiOutputDeviceWatcher.StartWatcher();
-        //    midiInputDeviceWatcher.StartWatcher();
-        //    this.MidiOutPortChannel = MidiOutPortChannel;
-        //    this.MidiInPortChannel = MidiInPortChannel;
-        //    Init(deviceName);
-        //}
 
         public void Init(String deviceName, SysExLab.MainPage mainPage)
         {
@@ -176,8 +211,6 @@ namespace SysExLab_MacOS
                 midiClient.ObjectAdded += delegate (object sender, ObjectAddedOrRemovedEventArgs e)
                 {
                     Int32 handle = ((MidiClient)sender).Handle;
-                    //MidiEndpoint me = (MidiEndpoint)e;
-                    //if (((MidiEndpoint)e).Child.IsBroadcast)
                     IntPtr ip = new IntPtr(handle); 
                 };
                 midiClient.ObjectRemoved += delegate (object sender, ObjectAddedOrRemovedEventArgs e)
@@ -200,214 +233,57 @@ namespace SysExLab_MacOS
             midiOutPort = midiClient.CreateOutputPort("MIDI Out Port");
             midiInPort = midiClient.CreateInputPort("MIDI In Port");
             midiInPort.MessageReceived += MidiInPort_MessageReceived;
-            //midiInPort.ConnectSource()
 
-            //            Midi.Restart();
-            for (Int32 i = 0; i < Midi.DeviceCount; i++)
+            for (Int32 deviceIndex = 0; deviceIndex < Midi.DeviceCount; deviceIndex++)
             {
-                md = Midi.GetDevice(i);
-                //if (md.Name != null)
+                md = Midi.GetDevice(deviceIndex);
                 if (md.EntityCount > 0)
                 {
-                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
-                    if (md.Name.Contains("INTEGRA-7"))
+                    for (Int32 e = 0; e < md.EntityCount; e++)
                     {
-                        for (Int32 e = 0; e < md.EntityCount; e++)
+                        MidiEntity me = md.GetEntity(e);
+                        if (me.Destinations > 0)
                         {
+                            mainPage.uIHandler.midiInputDevice.Items.Add(md.Name);
+                        }
+                        if (me.Destinations > 0)
+                        {
+                            mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
+                        }
+                        if (md.Name.Contains("INTEGRA-7"))
+                        {
+                            midiDevice = md;
                             midiEntity = md.GetEntity(e);
                             midiInPort.ConnectSource(midiEntity.GetSource(0));
                             midiOutPort.ConnectSource(midiEntity.GetDestination(0));
-                            //MidiEntity me = md.GetEntity(0);
-                            //MidiEndpoint mep = me.GetDestination(0);
-                            //if (mep.IsBroadcast)
-                            //{
-                            //    midiOutPort.ConnectSource(midiEntity.GetSource(0));
-                            //}
-                            //else
-                            //{
-                            //    midiInPort.ConnectSource(midiEntity.GetSource(0));
-                            //}
-                            //midiInPort = me.GetSource(0);
-                            //midiOutPort.IsBroadcast = true;
-                            //midiInPort.IsBroadcast = false;
-                            //midiInPort.MessageReceived += MidiInPort_MessageReceived;
-                            /*midiInPort.MessageReceived += (sender, args) =>
-                            {
-                                //MidiDevice sender, MidiPacketsEventArgs args
-                                MidiPacket receivedMidiMessage = ((MidiPacketsEventArgs)args).Packets[0];
-                                rawData = new byte[receivedMidiMessage.Length];
-                                for (Int32 messageLength = 0; messageLength < receivedMidiMessage.Length; messageLength++)
-                                {
-                                    rawData[messageLength] = (byte)(receivedMidiMessage.Bytes + messageLength);
-                                }
-                                MessageReceived = true;
-                            };*/
-
+                            mainPage.uIHandler.midiOutputDevice.SelectedIndex = deviceIndex;
+                            mainPage.uIHandler.midiInputDevice.SelectedIndex = deviceIndex;
                         }
-                        mainPage.uIHandler.midiOutputDevice.SelectedIndex = i;
                     }
                 }
-                /* else if (md.DisplayName != null)
-                 {
-                     mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
-                     if (md.DisplayName.Contains("INTEGRA-7"))
-                     {
-                         for (Int32 e = 0; e < md.EntityCount; e++)
-                         {
-                             MidiEntity me = md.GetEntity(e);
-                             midiOutPort = me.GetDestination(0);
-                             midiInPort = me.GetSource(0);
-                             midiOutPort.IsBroadcast = true;
-                             midiInPort.IsBroadcast = false;
-                         }
-                         mainPage.uIHandler.midiOutputDevice.SelectedIndex = i;
-                     }
-                 }
-                 md.Dispose();
-             }
-         }
-             */
-                /*            for (Int32 i = 0; i < Midi.ExternalDeviceCount; i++)
-                            {
-                                md = Midi.GetExternalDevice(i);
-                                if (md.Name != null)
-                                {
-                                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.Name);
-                                    if (md.Name.Contains("INTEGRA-7"))
-                                    {
-                                        midiOutPort = md;
-                                    }
-                                }
-                                else if (md.DisplayName != null)
-                                {
-                                    mainPage.uIHandler.midiOutputDevice.Items.Add(md.DisplayName);
-                                    if (md.DisplayName.Contains("INTEGRA-7"))
-                                    {
-                                        midiOutPort = md;
-                                    }
-                                }
-                                md.Dispose();
-                            }
-                */
-                /*            DeviceInformationCollection midiOutputDevices = await DeviceInformation.FindAllAsync(MidiOutPort.GetDeviceSelector());
-                            DeviceInformationCollection midiInputDevices = await DeviceInformation.FindAllAsync(MidiInPort.GetDeviceSelector());
-                            DeviceInformation midiOutDevInfo = null;
-                            DeviceInformation midiInDevInfo = null;
-
-                            foreach (DeviceInformation device in midiOutputDevices)
-                            {
-                                if (device.Name.Contains(deviceName))
-                                {
-                                    midiOutDevInfo = device;
-                                    break;
-                                }
-                            }
-
-                            if (midiOutDevInfo != null)
-                            {
-                                midiOutPort = (MidiOutPort)await MidiOutPort.FromIdAsync(midiOutDevInfo.Id);
-                            }
-
-                            foreach (DeviceInformation device in midiInputDevices)
-                            {
-                                if (device.Name.Contains(deviceName))
-                                {
-                                    midiInDevInfo = device;
-                                    break;
-                                }
-                            }
-
-                            if (midiInDevInfo != null)
-                            {
-                                midiInPort = await MidiInPort.FromIdAsync(midiInDevInfo.Id);
-                            }
-
-                            if (midiOutPort == null)
-                            {
-                                System.Diagnostics.Debug.WriteLine("Unable to create MidiOutPort from output device");
-                            }
-
-                            if (midiInPort == null)
-                            {
-                                System.Diagnostics.Debug.WriteLine("Unable to create MidiInPort from output device");
-                            }
-                            else
-                            {
-                                midiInPort.MessageReceived += MidiInPort_MessageReceived;
-                            }
-                */
             }
+            rawData = new byte[2][];
+            rawData[0] = new byte[0];
+            rawData[1] = new byte[0];
+            validIndata = -1;
+            readIndex = 0;
+            writeIndex = 0;
+            timer = new Timer(Timer_Tick, MessageReceived, 1, 1);
         }
-/*        public void UpdateMidiComboBoxes(Picker midiOutputComboBox, Picker midiInputComboBox)
-        {
-            midiOutputDeviceWatcher.UpdateComboBox(midiOutputComboBox, MidiOutPortSelectedIndex);
-            midiInputDeviceWatcher.UpdateComboBox(midiInputComboBox, MidiInPortSelectedIndex);
-        }
-*/
+
         public void OutputDeviceChanged(Picker DeviceSelector)
         {
-/*            try
-            {
-                if (!String.IsNullOrEmpty((String)DeviceSelector.SelectedItem))
-                {
-                    var midiOutDeviceInformationCollection = midiOutputDeviceWatcher.DeviceInformationCollection;
-
-                    if (midiOutDeviceInformationCollection == null)
-                    {
-                        return;
-                    }
-
-                    DeviceInformation midiOutDevInfo = midiOutDeviceInformationCollection[DeviceSelector.SelectedIndex];
-
-                    if (midiOutDevInfo == null)
-                    {
-                        return;
-                    }
-
-                    midiOutPort = (MidiOutPort)await MidiOutPort.FromIdAsync(midiOutDevInfo.Id);
-
-                    if (midiOutPort == null)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Unable to create MidiOutPort from output device");
-                        return;
-                    }
-                }
-            }
-            catch { }
-*/        }
+            // In MacOS this is handled above, in midiClient.ObjectRemoved and ObjectAdded.
+            // The windows version needs this function, so it is in the interface, thus
+            // must be present even if not used.
+        }
 
         public void InputDeviceChanged(Picker DeviceSelector)
         {
-/*            try
-            {
-                if (!String.IsNullOrEmpty((String)DeviceSelector.SelectedItem))
-                {
-                    var midiInDeviceInformationCollection = midiInputDeviceWatcher.DeviceInformationCollection;
-
-                    if (midiInDeviceInformationCollection == null)
-                    {
-                        return;
-                    }
-
-                    DeviceInformation midiInDevInfo = midiInDeviceInformationCollection[DeviceSelector.SelectedIndex];
-
-                    if (midiInDevInfo == null)
-                    {
-                        return;
-                    }
-
-                    midiInPort = await MidiInPort.FromIdAsync(midiInDevInfo.Id);
-
-                    if (midiInPort == null)
-                    {
-                        System.Diagnostics.Debug.WriteLine("Unable to create MidiInPort from input device");
-                        return;
-                    }
-                    midiInPort.MessageReceived += MidiInPort_MessageReceived;
-                }
-            }
-            catch { }
-*/        }
+            // In MacOS this is handled above, in midiClient.ObjectRemoved and ObjectAdded
+            // The windows version needs this function, so it is in the interface, thus
+            // must be present even if not used.
+        }
 
         public void NoteOn(byte currentChannel, byte noteNumber, byte velocity)
         {
