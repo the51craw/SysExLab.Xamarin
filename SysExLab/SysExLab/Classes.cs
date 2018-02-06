@@ -53,17 +53,19 @@ namespace SysExLab
                                 controls[i].SetValue(Button.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(Button.VerticalOptionsProperty, LayoutOptions.Start);
                                 controls[i].SetValue(Button.BorderWidthProperty, 1);
-                                controls[i].SetValue(Button.BorderColorProperty, Color.Black);
+                                controls[i].SetValue(Button.BorderColorProperty, UIHandler.colorSettings.Frame);
                             }
                             else if (controls[i].GetType() == typeof(Switch))
                             {
                                 controls[i].SetValue(Switch.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(Switch.VerticalOptionsProperty, LayoutOptions.Start);
+                                controls[i].SetValue(LabeledTextInput.BackgroundColorProperty, UIHandler.colorSettings.Background);
                             }
                             else if (controls[i].GetType() == typeof(LabeledSwitch))
                             {
                                 controls[i].SetValue(LabeledSwitch.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(LabeledSwitch.VerticalOptionsProperty, LayoutOptions.Start);
+                                controls[i].SetValue(LabeledTextInput.BackgroundColorProperty, UIHandler.colorSettings.Background);
                             }
                             else if (controls[i].GetType() == typeof(ListView))
                             {
@@ -79,6 +81,7 @@ namespace SysExLab
                             {
                                 controls[i].SetValue(Label.HorizontalOptionsProperty, LayoutOptions.EndAndExpand);
                                 controls[i].SetValue(Label.VerticalOptionsProperty, LayoutOptions.Start);
+                                controls[i].SetValue(LabeledTextInput.BackgroundColorProperty, UIHandler.colorSettings.Background);
                             }
                             else if (controls[i].GetType() == typeof(Editor))
                             {
@@ -94,13 +97,12 @@ namespace SysExLab
                             {
                                 controls[i].SetValue(LabeledText.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(LabeledText.VerticalOptionsProperty, LayoutOptions.Start);
-                                controls[i].SetValue(LabeledText.BackgroundColorProperty, Color.Red);
+                                controls[i].SetValue(LabeledTextInput.BackgroundColorProperty, UIHandler.colorSettings.Background);
                             }
                             else if (controls[i].GetType() == typeof(LabeledTextInput))
                             {
                                 controls[i].SetValue(LabeledTextInput.HorizontalOptionsProperty, LayoutOptions.FillAndExpand);
                                 controls[i].SetValue(LabeledTextInput.VerticalOptionsProperty, LayoutOptions.Start);
-                                controls[i].SetValue(LabeledTextInput.BackgroundColorProperty, Color.Red);
                             }
                             else if (controls[i].GetType() == typeof(Grid))
                             {

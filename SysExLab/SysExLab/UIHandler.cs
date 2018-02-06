@@ -28,6 +28,7 @@ namespace SysExLab
         SysExLab.MainPage mainPage;
         StackLayout mainStackLayout { get; set; }
         public static _appType appType;
+        public static ColorSettings colorSettings { get; set; }
         _page page;
         public Picker midiOutputDevice { get; set; }
         public Picker midiInputDevice { get; set; }
@@ -49,6 +50,7 @@ namespace SysExLab
             this.mainStackLayout = mainStackLayout;
             this.mainPage = mainPage;
             page = _page.MAIN;
+            colorSettings = new ColorSettings(_colorSettings.LIGHT);
         }
 
         public void Clear()

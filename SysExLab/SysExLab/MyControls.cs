@@ -19,6 +19,33 @@ namespace SysExLab
         AFTER,
     }
 
+    public enum _colorSettings
+    {
+        DARK,
+        LIGHT,
+    }
+
+    public class ColorSettings
+    {
+        public Color Background { get; set; }
+        public Color Frame { get; set; }
+        public Color Text { get; set; }
+
+        public ColorSettings(_colorSettings colorSettings)
+        {
+            switch (colorSettings)
+            {
+                case _colorSettings.DARK:
+                    break;
+                case _colorSettings.LIGHT:
+                    Background = Color.SeaShell;
+                    Frame = Color.Black;
+                    Text = Color.Black;
+                    break;
+            }
+        }
+    }
+
     public class LabeledText : Grid
     {
         //public Grid TheGrid { get; set; }

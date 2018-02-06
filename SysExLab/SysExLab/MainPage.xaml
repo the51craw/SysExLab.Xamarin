@@ -6,14 +6,12 @@
     <ContentPage.Content
         VerticalOptions="Fill" 
         HorizontalOptions="Fill"
-        BackgroundColor="Green"
         Margin="0" 
         Padding="0"
         Spacing="0">
         <StackLayout x:Name="MainStackLayout" 
             VerticalOptions="Fill" 
             HorizontalOptions="Fill"
-            BackgroundColor="Green"
             Margin="0" 
             Padding="0"
             Spacing="0" />
