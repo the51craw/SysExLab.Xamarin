@@ -336,7 +336,8 @@ namespace SysExLab_MacOS
             {
                 MidiPacket[] mp = new MidiPacket[1];
                 mp[0] = new MidiPacket(0, bytes);
-                midiOutPort.Send((MidiEndpoint)midiOutEndpoint, mp);
+                midiOutPort.Send(midiOutEndpoint, mp);
+                mp[0].Dispose();
             }
         }
 
