@@ -15,6 +15,7 @@ namespace SysExLab_MacOS
         public MidiPort midiInPort;
         public MidiDevice midiDevice;
         public MidiEntity midiEntity;
+        public MidiEndpoint midiOutEndpoint;
         MidiPacket midiPacket;
         unsafe byte *indataPointer;
         public byte MidiOutPortChannel { get; set; }
@@ -256,6 +257,7 @@ namespace SysExLab_MacOS
                             midiEntity = md.GetEntity(e);
                             midiInPort.ConnectSource(midiEntity.GetSource(0));
                             midiOutPort.ConnectSource(midiEntity.GetDestination(0));
+                            midiOutEndpoint = me.GetDestination(0);
                             mainPage.uIHandler.midiOutputDevice.SelectedIndex = deviceIndex;
                             mainPage.uIHandler.midiInputDevice.SelectedIndex = deviceIndex;
                         }
@@ -287,86 +289,60 @@ namespace SysExLab_MacOS
 
         public void NoteOn(byte currentChannel, byte noteNumber, byte velocity)
         {
-            //CoreMidi.MidiPacket receivedMidiMessage = args.Packets[0];
-            //rawData = new byte[receivedMidiMessage.Length];
-            if (midiOutPort != null)
-            {
-                Byte[] bytes = new Byte[] { 0x80, 0x64, 0x64 };
-                NSData data = NSData.FromArray(bytes);
-                //MidiPacket mp = new MidiPacket(0, bytes);
-                //NSMutableArray ma = NSMutableArray.FromArray<Byte[]>(bytes);
-
-                //data = mp.Bytes;
-                IntPtr ip = data.ClassHandle;
-                midiOutPort.SetData(data.ClassHandle, data);
-                //midiOutPort.Send()
-                //midiOutPort.FlushOutput();
-
-                //IMidiMessage midiMessageToSend = new MidiNoteOnMessage(currentChannel, noteNumber, velocity);
-                //midiOutPort.SendMessage(midiMessageToSend);
-            }
+            Byte[] bytes = new Byte[] { (byte)(0x90 & currentChannel), noteNumber, velocity };
+            SendPacket(bytes);
         }
 
         public void NoteOff(byte currentChannel, byte noteNumber)
         {
-            if (midiOutPort != null)
-            {
-                //IMidiMessage midiMessageToSend = new MidiNoteOnMessage(currentChannel, noteNumber, 0);
-                //midiOutPort.SendMessage(midiMessageToSend);
-            }
+            Byte[] bytes = new Byte[] { (byte)(0x80 & currentChannel), noteNumber, 0x00 };
+            SendPacket(bytes);
         }
 
         public void SendControlChange(byte channel, byte controller, byte value)
         {
-            if (midiOutPort != null)
-            {
-                //IMidiMessage midiMessageToSend = new MidiControlChangeMessage(channel, controller, value);
-                //midiOutPort.SendMessage(midiMessageToSend);
-            }
+            Byte[] bytes = new Byte[] { (byte)(0xb0 & channel), controller, value };
+            SendPacket(bytes);
         }
 
-        public void SetVolume(byte currentChannel, byte volume)
+        public void SetVolume(byte channel, byte volume)
+        {
+            SendControlChange(channel, 0x07, volume);
+        }
+
+        public void ProgramChange(byte channel, String smsb, String slsb, String spc)
+        {
+            Byte[] bytes = new Byte[] { (byte)(0xb0 & channel), 0x00, (byte)(UInt16.Parse(smsb))};
+            SendPacket(bytes);
+            bytes = new Byte[] { (byte)(0xb0 & channel), 0x20, (byte)(UInt16.Parse(slsb))};
+            SendPacket(bytes);
+            bytes = new Byte[] { (byte)(0xc0 & channel), (byte)(UInt16.Parse(spc) - 1) };
+            SendPacket(bytes);
+        }
+
+        public void ProgramChange(byte channel, byte msb, byte lsb, byte pc)
+        {
+            Byte[] bytes = new Byte[] { (byte)(0xb0 & channel), 0x00, msb };
+            SendPacket(bytes);
+            bytes = new Byte[] { (byte)(0xb0 & channel), 0x20, lsb };
+            SendPacket(bytes);
+            bytes = new Byte[] { (byte)(0xc0 & channel), (byte)(pc - 1) };
+            SendPacket(bytes);
+        }
+
+        private void SendPacket(byte[] bytes)
         {
             if (midiOutPort != null)
             {
-                //IMidiMessage midiMessageToSend = new MidiControlChangeMessage(currentChannel, 0x07, volume);
-                //midiOutPort.SendMessage(midiMessageToSend);
+                MidiPacket[] mp = new MidiPacket[1];
+                mp[0] = new MidiPacket(0, bytes);
+                midiOutPort.Send((MidiEndpoint)midiOutEndpoint, mp);
             }
         }
-
-        public void ProgramChange(byte currentChannel, String smsb, String slsb, String spc)
-        {
-/*            try
-            {
-                MidiControlChangeMessage controlChangeMsb = new MidiControlChangeMessage(currentChannel, 0x00, (byte)(UInt16.Parse(smsb)));
-                MidiControlChangeMessage controlChangeLsb = new MidiControlChangeMessage(currentChannel, 0x20, (byte)(UInt16.Parse(slsb)));
-                MidiProgramChangeMessage programChange = new MidiProgramChangeMessage(currentChannel, (byte)(UInt16.Parse(spc) - 1));
-                midiOutPort.SendMessage(controlChangeMsb);
-                midiOutPort.SendMessage(controlChangeLsb);
-                midiOutPort.SendMessage(programChange);
-            }
-            catch { }
-*/        }
-
-        public void ProgramChange(byte currentChannel, byte msb, byte lsb, byte pc)
-        {
-/*            try
-            {
-                MidiControlChangeMessage controlChangeMsb = new MidiControlChangeMessage(currentChannel, 0x00, msb);
-                MidiControlChangeMessage controlChangeLsb = new MidiControlChangeMessage(currentChannel, 0x20, lsb);
-                MidiProgramChangeMessage programChange = new MidiProgramChangeMessage(currentChannel, (byte)(pc - 1));
-                midiOutPort.SendMessage(controlChangeMsb);
-                midiOutPort.SendMessage(controlChangeLsb);
-                midiOutPort.SendMessage(programChange);
-            }
-            catch { }
-*/        }
 
         public void SendSystemExclusive(byte[] bytes)
         {
-            //IBuffer buffer = bytes.AsBuffer();
-            //MidiSystemExclusiveMessage midiMessageToSend = new MidiSystemExclusiveMessage(buffer);
-            //midiOutPort.SendMessage(midiMessageToSend);
+                SendPacket(bytes);
         }
 
         public byte[] SystemExclusiveRQ1Message(byte[] Address, byte[] Length)
@@ -450,7 +426,9 @@ namespace SysExLab_MacOS
                 {
                     return 0xff;
                 }
-                return (byte)(chars.IndexOf(s1) * 16 + chars.IndexOf(s2));
+                    return (byte)(chars.IndexOf(s1, 
+                        StringComparison.CurrentCulture) * 16 +
+                        chars.IndexOf(s2, StringComparison.CurrentCulture));
             }
 
         }
